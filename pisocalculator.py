@@ -225,154 +225,171 @@ def main():
     
     st.markdown("")
     
+    # Initialize session state for results
+    if 'results' not in st.session_state:
+        st.session_state.results = None
+    
     # Calculate button
     if st.button("🦛 Calcular con Happy Hipo"):
         if property_price > 0:
-            results = calculate_property_costs(property_price, commission_percentage, down_payment)
-            
-            # Create tabs
-            tab1, tab2, tab3 = st.tabs(["💰 Costes Totales", "🏦 Escenarios de Financiación", "📅 Cuota Mensual"])
-            
-            # TAB 1: Total Costs
-            with tab1:
-                st.markdown("### 📊 Desglose de Costes")
-                
-                # Property price
-                st.markdown(f"""
-                    <div class="metric-container">
-                        <h4 style="margin: 0; color: #7f8c8d; font-size: 0.9rem;">Precio del Piso</h4>
-                        <h2 style="margin: 0.3rem 0 0 0; color: #2c3e50; font-size: 1.5rem;">{format_currency(results['property_price'])}</h2>
-                    </div>
-                """, unsafe_allow_html=True)
-                
-                # Commission breakdown
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("Comisión Base", format_currency(results['commission_base']))
-                with col2:
-                    st.metric("IVA (21%)", format_currency(results['commission_vat']))
-                with col3:
-                    st.metric("Total Comisión", format_currency(results['commission_total']))
-                
-                # Other costs
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.metric("ITP (5.4%)", format_currency(results['itp']))
-                with col2:
-                    st.metric("Tasación + Notaría", format_currency(results['fixed_costs']))
-                
-                # Total cost (highlighted)
-                st.markdown(f"""
-                    <div class="total-container">
-                        <h3 style="margin: 0; font-weight: 300; font-size: 0.95rem;">COSTE TOTAL</h3>
-                        <h1 style="margin: 0.5rem 0 0 0; font-size: 2rem; font-weight: 300;">{format_currency(results['total_cost'])}</h1>
-                    </div>
-                """, unsafe_allow_html=True)
-                
-                # Additional costs info
-                st.info(f"💰 **Costes adicionales al precio del piso:** {format_currency(results['additional_costs'])} ({(results['additional_costs']/results['property_price']*100):.2f}%)")
-            
-            # TAB 2: Financing Scenarios
-            with tab2:
-                st.markdown("### 🏦 Tu Financiación Actual")
-                
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.metric("Entrada Aportada", format_currency(results['down_payment']))
-                with col2:
-                    st.metric("Cantidad a Financiar", format_currency(results['money_after_down_payment']))
-                
-                # Mortgage percentage
-                st.markdown(f"""
-                    <div class="mortgage-container">
-                        <h4 style="margin: 0; font-weight: 300; font-size: 0.9rem;">PORCENTAJE DE HIPOTECA</h4>
-                        <h2 style="margin: 0.3rem 0 0 0; font-size: 1.8rem; font-weight: 400;">{results['mortgage_percentage']:.1f}%</h2>
-                        <p style="margin: 0.3rem 0 0 0; font-size: 0.85rem; opacity: 0.9;">sobre el precio del piso</p>
-                    </div>
-                """, unsafe_allow_html=True)
-                
-                if results['mortgage_percentage'] > 80:
-                    st.warning("⚠️ La mayoría de bancos no conceden hipotecas superiores al 80% del valor del inmueble.")
-                elif results['mortgage_percentage'] > 70:
-                    st.info("ℹ️ El porcentaje de hipoteca está entre el 70-80%. Algunas entidades pueden requerir condiciones adicionales.")
-                else:
-                    st.success("✅ El porcentaje de hipoteca es favorable (≤70%).")
-                
-                st.markdown("")
-                st.markdown("### 📋 Escenarios de Financiación")
-                st.caption("¿Cuánto necesitas de entrada según el % de hipoteca?")
-                
-                # Generate financing scenarios
-                scenarios_df = calculate_financing_scenarios(results['property_price'], results['additional_costs'])
-                
-                # Display table with custom styling
-                st.dataframe(
-                    scenarios_df,
-                    hide_index=True,
-                    width='stretch'
-                )
-                
-                st.info("💡 **Recuerda:** La entrada debe cubrir los gastos adicionales + la diferencia entre el precio y la hipoteca.")
-            
-            # TAB 3: Monthly Payment
-            with tab3:
-                st.markdown("### 📅 Calcula tu Cuota Mensual")
-                
-                col1, col2 = st.columns(2)
-                with col1:
-                    interest_rate = st.number_input(
-                        "TAE (%) 📈",
-                        min_value=0.0,
-                        max_value=15.0,
-                        value=2.5,
-                        step=0.1,
-                        format="%.2f",
-                        help="Tipo de interés anual"
-                    )
-                with col2:
-                    loan_years = st.number_input(
-                        "Años 📆",
-                        min_value=5,
-                        max_value=40,
-                        value=30,
-                        step=1,
-                        help="Plazo de la hipoteca en años"
-                    )
-                
-                # Calculate monthly payment
-                monthly_payment = calculate_monthly_payment(
-                    results['money_after_down_payment'],
-                    interest_rate,
-                    loan_years
-                )
-                
-                # Display monthly payment
-                st.markdown(f"""
-                    <div class="total-container">
-                        <h3 style="margin: 0; font-weight: 300; font-size: 0.95rem;">CUOTA MENSUAL</h3>
-                        <h1 style="margin: 0.5rem 0 0 0; font-size: 2rem; font-weight: 300;">{format_currency(monthly_payment)}</h1>
-                        <p style="margin: 0.5rem 0 0 0; font-size: 0.85rem; opacity: 0.8;">durante {loan_years} años</p>
-                    </div>
-                """, unsafe_allow_html=True)
-                
-                # Additional information
-                total_to_pay = monthly_payment * loan_years * 12
-                total_interest = total_to_pay - results['money_after_down_payment']
-                
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("Total a Pagar", format_currency(total_to_pay))
-                with col2:
-                    st.metric("Intereses Totales", format_currency(total_interest))
-                with col3:
-                    st.metric("Nº de Cuotas", f"{loan_years * 12}")
-                
-                # Income recommendation
-                recommended_income = monthly_payment / 0.35
-                st.info(f"💡 **Ingresos recomendados:** {format_currency(recommended_income)}/mes (la cuota no debería superar el 35% de tus ingresos)")
-            
+            st.session_state.results = calculate_property_costs(property_price, commission_percentage, down_payment)
         else:
             st.warning("⚠️ Por favor, introduce un precio válido para el piso.")
+    
+    # Display results if they exist
+    if st.session_state.results is not None:
+        results = st.session_state.results
+        
+        # Create tabs
+        tab1, tab2, tab3 = st.tabs(["💰 Costes Totales", "🏦 Escenarios de Financiación", "📅 Cuota Mensual"])
+        
+        # TAB 1: Total Costs
+        with tab1:
+            st.markdown("### 📊 Desglose de Costes")
+            
+            # Property price
+            st.markdown(f"""
+                <div class="metric-container">
+                    <h4 style="margin: 0; color: #7f8c8d; font-size: 0.9rem;">Precio del Piso</h4>
+                    <h2 style="margin: 0.3rem 0 0 0; color: #2c3e50; font-size: 1.5rem;">{format_currency(results['property_price'])}</h2>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            # Commission breakdown
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Comisión Base", format_currency(results['commission_base']))
+            with col2:
+                st.metric("IVA (21%)", format_currency(results['commission_vat']))
+            with col3:
+                st.metric("Total Comisión", format_currency(results['commission_total']))
+            
+            # Other costs
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("ITP (5.4%)", format_currency(results['itp']))
+            with col2:
+                st.metric("Tasación + Notaría", format_currency(results['fixed_costs']))
+            
+            # Total cost (highlighted)
+            st.markdown(f"""
+                <div class="total-container">
+                    <h3 style="margin: 0; font-weight: 300; font-size: 0.95rem;">COSTE TOTAL</h3>
+                    <h1 style="margin: 0.5rem 0 0 0; font-size: 2rem; font-weight: 300;">{format_currency(results['total_cost'])}</h1>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            # Additional costs info
+            st.info(f"💰 **Costes adicionales al precio del piso:** {format_currency(results['additional_costs'])} ({(results['additional_costs']/results['property_price']*100):.2f}%)")
+        
+        # TAB 2: Financing Scenarios
+        with tab2:
+            st.markdown("### 🏦 Tu Financiación Actual")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Entrada Aportada", format_currency(results['down_payment']))
+            with col2:
+                st.metric("Cantidad a Financiar", format_currency(results['money_after_down_payment']))
+            
+            # Mortgage percentage
+            st.markdown(f"""
+                <div class="mortgage-container">
+                    <h4 style="margin: 0; font-weight: 300; font-size: 0.9rem;">PORCENTAJE DE HIPOTECA</h4>
+                    <h2 style="margin: 0.3rem 0 0 0; font-size: 1.8rem; font-weight: 400;">{results['mortgage_percentage']:.1f}%</h2>
+                    <p style="margin: 0.3rem 0 0 0; font-size: 0.85rem; opacity: 0.9;">sobre el precio del piso</p>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            if results['mortgage_percentage'] > 80:
+                st.warning("⚠️ La mayoría de bancos no conceden hipotecas superiores al 80% del valor del inmueble.")
+            elif results['mortgage_percentage'] > 70:
+                st.info("ℹ️ El porcentaje de hipoteca está entre el 70-80%. Algunas entidades pueden requerir condiciones adicionales.")
+            else:
+                st.success("✅ El porcentaje de hipoteca es favorable (≤70%).")
+            
+            st.markdown("")
+            st.markdown("### 📋 Escenarios de Financiación")
+            st.caption("¿Cuánto necesitas de entrada según el % de hipoteca?")
+            
+            # Generate financing scenarios
+            scenarios_df = calculate_financing_scenarios(results['property_price'], results['additional_costs'])
+            
+            # Display table with custom styling
+            st.dataframe(
+                scenarios_df,
+                hide_index=True,
+                width='stretch'
+            )
+            
+            st.info("💡 **Recuerda:** La entrada debe cubrir los gastos adicionales + la diferencia entre el precio y la hipoteca.")
+        
+        # TAB 3: Monthly Payment
+        with tab3:
+            st.markdown("### 📅 Calcula tu Cuota Mensual")
+            
+            # Initialize session state for mortgage parameters
+            if 'interest_rate' not in st.session_state:
+                st.session_state.interest_rate = 2.5
+            if 'loan_years' not in st.session_state:
+                st.session_state.loan_years = 30
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                interest_rate = st.number_input(
+                    "TAE (%) 📈",
+                    min_value=0.0,
+                    max_value=15.0,
+                    value=st.session_state.interest_rate,
+                    step=0.1,
+                    format="%.2f",
+                    help="Tipo de interés anual",
+                    key="interest_rate_input"
+                )
+                st.session_state.interest_rate = interest_rate
+            with col2:
+                loan_years = st.number_input(
+                    "Años 📆",
+                    min_value=5,
+                    max_value=40,
+                    value=st.session_state.loan_years,
+                    step=1,
+                    help="Plazo de la hipoteca en años",
+                    key="loan_years_input"
+                )
+                st.session_state.loan_years = loan_years
+            
+            # Calculate monthly payment
+            monthly_payment = calculate_monthly_payment(
+                results['money_after_down_payment'],
+                interest_rate,
+                loan_years
+            )
+            
+            # Display monthly payment
+            st.markdown(f"""
+                <div class="total-container">
+                    <h3 style="margin: 0; font-weight: 300; font-size: 0.95rem;">CUOTA MENSUAL</h3>
+                    <h1 style="margin: 0.5rem 0 0 0; font-size: 2rem; font-weight: 300;">{format_currency(monthly_payment)}</h1>
+                    <p style="margin: 0.5rem 0 0 0; font-size: 0.85rem; opacity: 0.8;">durante {loan_years} años</p>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            # Additional information
+            total_to_pay = monthly_payment * loan_years * 12
+            total_interest = total_to_pay - results['money_after_down_payment']
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Total a Pagar", format_currency(total_to_pay))
+            with col2:
+                st.metric("Intereses Totales", format_currency(total_interest))
+            with col3:
+                st.metric("Nº de Cuotas", f"{loan_years * 12}")
+            
+            # Income recommendation
+            recommended_income = monthly_payment / 0.35
+            st.info(f"💡 **Ingresos recomendados:** {format_currency(recommended_income)}/mes (la cuota no debería superar el 35% de tus ingresos)")
     
     # Footer
     st.markdown("")
